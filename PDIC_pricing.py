@@ -122,6 +122,69 @@ def price_parisian_down_out_call_mc(S_paths, K, L, r, T, D, num_steps):
     discounted_payoffs = np.exp(-r * T) * payoffs
     return np.mean(discounted_payoffs)
 
+def price_parisian_down_in_call_mc_with_ci(S_paths, K, L, r, T, D, num_steps, confidence=0.95):
+    dt = T / num_steps
+    min_consec_steps = int(D / dt)
+    num_simulations = S_paths.shape[0]
+    payoffs = np.zeros(num_simulations)
+
+    for i in range(num_simulations):
+        path = S_paths[i, :]
+        below_barrier = path < L
+        consec = 0
+        triggered = False
+        for flag in below_barrier:
+            if flag:
+                consec += 1
+                if consec >= min_consec_steps:
+                    triggered = True
+                    break
+            else:
+                consec = 0
+
+        if triggered:
+            ST = path[-1]
+            payoffs[i] = max(ST - K, 0)
+
+    discounted = np.exp(-r * T) * payoffs
+    mean = np.mean(discounted)
+    std_err = np.std(discounted, ddof=1) / np.sqrt(num_simulations)
+    z = norm.ppf(0.5 + confidence / 2)
+    ci = (mean - z * std_err, mean + z * std_err)
+    return mean, ci
+
+
+def price_parisian_down_out_call_mc_with_ci(S_paths, K, L, r, T, D, num_steps, confidence=0.95):
+    dt = T / num_steps
+    min_consec_steps = int(D / dt)
+    num_simulations = S_paths.shape[0]
+    payoffs = np.zeros(num_simulations)
+
+    for i in range(num_simulations):
+        path = S_paths[i, :]
+        below_barrier = path < L
+        consec = 0
+        knocked_out = False
+        for flag in below_barrier:
+            if flag:
+                consec += 1
+                if consec >= min_consec_steps:
+                    knocked_out = True
+                    break
+            else:
+                consec = 0
+
+        if not knocked_out:
+            ST = path[-1]
+            payoffs[i] = max(ST - K, 0)
+
+    discounted = np.exp(-r * T) * payoffs
+    mean = np.mean(discounted)
+    std_err = np.std(discounted, ddof=1) / np.sqrt(num_simulations)
+    z = norm.ppf(0.5 + confidence / 2)
+    ci = (mean - z * std_err, mean + z * std_err)
+    return mean, ci
+
 
 from scipy.stats import norm
 
