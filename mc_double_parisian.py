@@ -47,3 +47,19 @@ def price_parisian_double_in_call_mc(
         else:
             pay.append(0.0)
     return np.exp(-r*T) * np.mean(pay)
+
+def price_parisian_double_out_call_mc(
+        S_paths, K, L, U, r, T, D, num_steps):
+    """
+    Payoff payé SEULEMENT si AUCUNE excursion hors [L,U] d'au moins D
+    n’est observée avant T.
+    """
+    dt  = T / num_steps
+    pay = []
+    for p in S_paths:
+        if has_continuous_excursion(p, L, U, D, dt):
+            # option knock-out : désactivée → payoff nul
+            pay.append(0.0)
+        else:
+            pay.append(max(p[-1] - K, 0.0))
+    return np.exp(-r*T) * np.mean(pay)

@@ -7,6 +7,20 @@ from scipy.special import erf, ndtr
 from PDIC_pricing import laplace_transform_pdic_star_K_gt_L
 from PUIC_pricing import laplace_transform_puic_star_K_leq_L
 
+from scipy.stats import norm
+
+def black_scholes_call_star(x, K, T, r, q, sigma):
+    # prix "étoilé" du call vanille
+    from scipy.stats import norm
+    if T == 0:                       # garde-fou
+        return max(x - K, 0.0)
+    d1 = (np.log(x/K) + (r - q + 0.5*sigma**2)*T) / (sigma*np.sqrt(T))
+    d2 = d1 - sigma*np.sqrt(T)
+    call = (x*np.exp(-q*T)*norm.cdf(d1)
+            - K*np.exp(-r*T)*norm.cdf(d2))
+    m = (r - q - 0.5*sigma**2)/sigma
+    return np.exp((r+0.5*m*m)*T) * call
+
 
 
 def psi(z: complex):
@@ -47,9 +61,8 @@ def laplace_transform_double_in_star(x, K, L, U,
     A1 = np.trapz(np.exp(m*y) * (x*np.exp(sigma*y) - K) * Hy, y)
 
     factor = (np.exp((2*b1 - b2)*θ)
-              * θ * D
-              * psi( θ*np.sqrt(D))
-              / psi(-θ*np.sqrt(D)))
+              * psi(θ*np.sqrt(D))
+              / (θ * psi(-θ*np.sqrt(D))))
 
     return pdic_star + puic_star - factor*A1
 
@@ -78,3 +91,17 @@ def price_parisian_double_in_call_lt(x, K, L, U,
     m    = (r - q - 0.5*sigma*sigma) / sigma
     disc = np.exp(-(r + 0.5*m*m) * T)
     return disc * star
+
+def price_parisian_double_out_call_lt(x, K, L, U,
+                                      r, q, sigma,
+                                      T, D, alpha=10.0, N=30):
+    # prix Knock-Out = call vanille - knock-in
+    C_vanille = black_scholes_call_star(x, K, T, r, q, sigma)
+    C_in_star = inverse_laplace_transform(
+                    laplace_transform_double_in_star, T,
+                    x, K, L, U, r, q, sigma, D,
+                    alpha=alpha, N=N)
+    m = (r - q - 0.5*sigma*sigma)/sigma
+    disc = np.exp(-(r + 0.5*m*m)*T)
+    return disc * (C_vanille - C_in_star)
+
